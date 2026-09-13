@@ -13,7 +13,8 @@ ROOT = Path(__file__).resolve().parents[1]
 REQUIRED_FILES = (
     "SKILL.md", "README.md", "LICENSE", "agents/openai.yaml",
     "references/gpt6-best-practices.md", "references/prompt-patterns.md",
-    "references/api-contract.md", "examples/worked-examples.md",
+    "references/api-contract.md", "references/instruction-audit.md",
+    "examples/worked-examples.md", "examples/instruction-audit.md", "CHANGELOG.md",
     "examples/extraction-request.json", "examples/retest-prompts.json",
 )
 
@@ -59,12 +60,12 @@ def validate() -> int:
         fields[key] = value.strip()
     require(set(fields) == {"name", "description"}, "Unexpected frontmatter fields")
     require(fields["name"] == "gpt6-prompt-writer", "Unexpected skill name")
-    require(80 <= len(fields["description"]) <= 1024, "Description length outside expected range")
+    require(0 < len(fields["description"]) <= 1024, "Description must be nonempty and <=1024 characters")
     require(len(body.splitlines()) <= 500, "Move details out of SKILL.md")
     for heading in ("## 工作流程", "## 边界", "## 质量标准"):
         require(heading in body, f"Missing section: {heading}")
 
-    markdown = [ROOT / "README.md", ROOT / "SKILL.md"]
+    markdown = [ROOT / "README.md", ROOT / "SKILL.md", ROOT / "CHANGELOG.md"]
     markdown += sorted((ROOT / "references").glob("*.md"))
     markdown += sorted((ROOT / "examples").glob("*.md"))
     for path in markdown:
@@ -81,6 +82,10 @@ def validate() -> int:
     for ref in (ROOT / "references").glob("*.md"):
         name = ref.relative_to(ROOT).as_posix()
         require(f"`{name}`" in body, f"Reference missing from resource guide: {name}")
+    for name in re.findall(r"`((?:references|examples)/[^`]+)`", body):
+        destination = (ROOT / name).resolve()
+        require(destination.is_relative_to(ROOT) and destination.is_file(),
+                f"Broken/outside resource route: {name}")
 
     fixtures = read_json(ROOT / "examples/retest-prompts.json")
     require(fixtures["target_model"] == "gpt-6-astra", "Unexpected fixture target model")

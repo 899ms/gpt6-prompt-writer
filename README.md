@@ -4,7 +4,7 @@
 
 A Chinese-first Codex skill for writing, refining, compressing, and diagnosing GPT‑6 Astra prompts, grounded in official OpenAI guidance.
 
-适合从零写提示词、修复 Agent 反复确认或过度测试、压缩旧提示词，以及设计 API 结构化输出。默认先给一个可复制版本，再按需要附变量和使用说明。
+适合从零写提示词、修复 Agent 反复确认或过度测试、压缩旧提示词，以及设计 API 结构化输出。也能审计面向 Astra 的 Skill 描述与 AGENTS.md，把全局预读和过时流程改成按需规则。默认先给一个可复制版本，再按需要附变量和使用说明。
 
 ## 先试一句
 
@@ -48,9 +48,12 @@ python3 "${CODEX_HOME:-$HOME/.codex}/skills/.system/skill-installer/scripts/inst
 | 优化 Agent | `$gpt6-prompt-writer 优化这段 GPT6 编码提示词，让它在已授权范围内完成修复，减少无谓确认。下面是原文：……` |
 | 压缩 | `$gpt6-prompt-writer 压缩这段提示词，保留所有事实、权限、输出格式和失败处理约束：……` |
 | 只诊断 | `$gpt6-prompt-writer 只诊断以下 GPT6 提示词的冲突，不重写：……` |
+| 指令审计 | `$gpt6-prompt-writer 优化面向 Astra 的这段 AGENTS.md：每次编辑读完所有文档，首版实现后等确认。保留项目必需检查和发布权限：……` |
 | API 提取 | `$gpt6-prompt-writer 为 GPT6 设计课程报名信息提取提示词和 Responses 请求，姓名和课程可能缺失，下游需要稳定解析。` |
 
 更多输入与成品见 [完整示例](examples/worked-examples.md)。
+
+精简 Skill 描述、条件化资料读取和保留迁移依赖，见 [指令审计范例](examples/instruction-audit.md)。只要诊断时说明“不重写”；需要直接修改文件时给出目标路径。
 
 ## GPT‑6 适配重点
 
@@ -62,22 +65,27 @@ python3 "${CODEX_HOME:-$HOME/.codex}/skills/.system/skill-installer/scripts/inst
 - **协作分工**：仅在宿主提供并允许子代理时，描述独立分工和整合责任。
 - **适量验证**：完成项目必需检查和相关行为验证，以新问题决定是否扩大测试。
 
+本次吸收 [Rethinking skills and prompts for GPT‑6 Astra](https://developers.openai.com/blog/rethinking-skills-and-prompts-for-gpt-6-astra#better-skills)：入口按任务选择参考资料，简单写作可直接交付；旧指令按保留、条件化、合并、删除处理。真实依赖、领域约定、权限和输出契约仍需保留。Astra 专用建议不会无条件套到共享仓库的其他模型上。
+
 API 配置与自然语言提示词分开处理；模型与参数事实见 [API 契约](references/api-contract.md)。模板和选择规则属于本项目的实现，不代表 OpenAI 的统一规定。
 
 ## 文件结构
 
 ```text
 gpt6-prompt-writer/
-├── SKILL.md                       # 触发条件、工作流程与输出约定
+├── SKILL.md                       # 精简入口、按需路由与共同契约
+├── CHANGELOG.md                   # 吸收决策、证据边界与回滚点
 ├── agents/openai.yaml             # Codex 显示名称与默认提示
 ├── references/
 │   ├── gpt6-best-practices.md      # 官方依据及规则映射
 │   ├── prompt-patterns.md         # 按需选用的提示词模块
+│   ├── instruction-audit.md       # Skill / AGENTS.md 的减法审计
 │   └── api-contract.md            # API 角色、参数和 schema 边界
 ├── examples/
 │   ├── worked-examples.md         # 完整写作示例
+│   ├── instruction-audit.md       # 描述、资料读取与真实依赖范例
 │   ├── extraction-request.json    # 合法 JSON 请求体示例
-│   └── retest-prompts.json        # 14 个待执行回归场景
+│   └── retest-prompts.json        # 23 个待执行回归场景
 ├── scripts/validate.py            # 无第三方依赖的静态校验
 └── LICENSE
 ```
@@ -90,15 +98,15 @@ gpt6-prompt-writer/
 python3 scripts/validate.py
 ```
 
-脚本检查 Skill 元数据、必需文件、相对引用、JSON 语法、回归用例格式，以及示例请求的模型/字段/schema 约束。GitHub Actions 执行同一命令。它不联网、不调用模型，也不是完整 JSON Schema 验证器或安全扫描器。
+脚本检查 Skill 元数据、必需文件、相对引用、入口资源路径、JSON 语法、回归用例格式，以及示例请求的模型/字段/schema 约束。GitHub Actions 执行同一命令。它不联网、不调用模型，也不是完整 JSON Schema 验证器或安全扫描器。描述只检查非空和格式上限，不以最少字数鼓励堆叠触发词。
 
-当前为初版试用：结构检查通过；六个场景做过同一上下文的人工推演（E2 / dry-run）；尚无独立模型回放、真实 API 兼容性实测或成功率数据。14 个回归场景是测试输入与通过条件，不能当作 14 次测试通过记录。
+当前仍为试用候选（`provisional`）。本次在原 14 个场景上增加 9 个指令审计、按需读取与模型边界场景；23 个场景是输入与通过条件，不能当作 23 次模型测试通过记录。验证方式与结果见 [变更记录](CHANGELOG.md)；尚无隔离模型回放、真实 API 兼容性实测或成功率数据。
 
-修改提示词行为后，选择相关正常、缺信息、冲突输入做真实回放，记录版本、实际输出与失败条件。请勿将私密原始对话或凭据提交为测试材料。
+修改提示词行为后，选择相关正常、缺信息、冲突输入做真实回放，记录版本、实际输出与失败条件。触发描述增加近邻不触发输入；按需读取应检查实际读文件记录，不能仅从最终文字推断上下文开销。请勿将私密原始对话或凭据提交为测试材料。
 
 ## 依据与维护
 
-官方资料核验日期为 **2026-09-07**，目标为 **GPT‑6 Astra / `gpt-6-astra`**。动态指南将来可能指向新模型；用户明确指定 GPT‑6 时应继续核对它的专属资料，不自动换代。
+目标为 **GPT‑6 Astra / `gpt-6-astra`**。提示词章节与上述文章核验于 **2026-09-13**；API 与角色/schema 资料仍保留 **2026-09-07** 快照日期。动态指南将来可能指向新模型；用户明确指定 GPT‑6 时应继续核对它的专属资料，不自动换代。
 
 出处与证据边界见 [来源记录](references/gpt6-best-practices.md)。离线时可使用注明日期的快照；要求“最新”或可运行 API 配置时应重新查阅官方资料。
 
